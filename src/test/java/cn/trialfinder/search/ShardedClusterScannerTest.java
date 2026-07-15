@@ -23,9 +23,11 @@ class ShardedClusterScannerTest {
     @Test
     void candidateEstimateUsesTrialChamberRegionDensity() {
         FinderConfig circle = new FinderConfig(
-                0, 0, 0, 1_000_000, false, 128, AreaShape.CIRCLE, 3, 20, 8, 262_144);
+                0, 0, 0, 1_000_000, false, AreaShape.CIRCLE,
+                128, AreaShape.CIRCLE, 3, 20, 8, 262_144);
         FinderConfig world = new FinderConfig(
-                0, 0, 0, 1, true, 128, AreaShape.CIRCLE, 3, 20, 8, 262_144);
+                0, 0, 0, 1, true, AreaShape.CIRCLE,
+                128, AreaShape.CIRCLE, 3, 20, 8, 262_144);
 
         assertEquals(10_615_784, ShardedClusterScanner.estimatedCandidateCount(circle));
         assertEquals(12_164_792_388L, ShardedClusterScanner.estimatedCandidateCount(world));
@@ -44,7 +46,7 @@ class ShardedClusterScannerTest {
     private static void assertMatchesWholeArea(AreaShape shape) {
         FinderConfig config = new FinderConfig(
                 9_206_294_873_968_313_284L, 137, -219, 12_000,
-                false, 256, shape, 2, 0, 3, 2_000);
+                false, AreaShape.CIRCLE, 256, shape, 2, 0, 3, 2_000);
         List<BlockPoint> points = TrialChamberCandidates.enumerate(config);
         List<CircleClusters.StructureCluster> expected = switch (shape) {
             case CIRCLE -> CircleClusters.find(points, 256, 2);

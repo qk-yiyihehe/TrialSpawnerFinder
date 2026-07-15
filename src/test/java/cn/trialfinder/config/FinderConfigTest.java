@@ -35,9 +35,30 @@ class FinderConfigTest {
         assertEquals(-123, config.seed());
         assertEquals(-100, config.searchCenterX());
         assertEquals(AreaShape.SQUARE, config.areaShape());
+        assertEquals(AreaShape.CIRCLE, config.searchAreaShape());
         assertEquals(false, config.fullWorld());
         assertEquals(262_144, config.scanShardSizeBlocks());
         assertEquals(Math.min(8, Runtime.getRuntime().availableProcessors()), config.scanThreads());
+    }
+
+    @Test
+    void supportsSquareOuterSearchArea() throws IOException {
+        Path file = directory.resolve("finder.properties");
+        Files.writeString(file, """
+                seed=0
+                search-center-x=0
+                search-center-z=0
+                search-radius-blocks=100
+                search-area-shape=square
+                cluster-radius-blocks=128
+                area-shape=circle
+                min-structures=1
+                min-spawners=0
+                """);
+
+        FinderConfig config = FinderConfig.load(file);
+
+        assertEquals(true, config.containsSearchPoint(100, 100));
     }
 
     @Test

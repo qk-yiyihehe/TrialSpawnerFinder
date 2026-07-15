@@ -16,6 +16,7 @@ public record FinderConfig(
         int searchCenterZ,
         int searchRadiusBlocks,
         boolean fullWorld,
+        AreaShape searchAreaShape,
         int clusterRadiusBlocks,
         AreaShape areaShape,
         int minStructures,
@@ -35,6 +36,7 @@ public record FinderConfig(
                 parseInt(properties, "search-center-z"),
                 parseInt(properties, "search-radius-blocks"),
                 parseOptionalBoolean(properties, "full-world", false),
+                AreaShape.parse(properties.getProperty("search-area-shape", "circle")),
                 parseInt(properties, "cluster-radius-blocks"),
                 AreaShape.parse(properties.getProperty("area-shape")),
                 parseInt(properties, "min-structures"),
@@ -89,10 +91,8 @@ public record FinderConfig(
     public boolean containsSearchPoint(long x, long z) {
         if (x < -WORLD_LIMIT || x > WORLD_LIMIT || z < -WORLD_LIMIT || z > WORLD_LIMIT) return false;
         if (fullWorld) return true;
-        long dx = x - searchCenterX;
-        long dz = z - searchCenterZ;
-        long radius = searchRadiusBlocks;
-        return dx * dx + dz * dz <= radius * radius;
+        return searchAreaShape.contains(
+                searchCenterX, searchCenterZ, x, z, searchRadiusBlocks);
     }
 
     private static int parseInt(Properties properties, String key) {
