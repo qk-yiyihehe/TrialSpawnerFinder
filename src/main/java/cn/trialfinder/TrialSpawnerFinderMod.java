@@ -3,6 +3,7 @@ package cn.trialfinder;
 import cn.trialfinder.config.FinderConfig;
 import cn.trialfinder.io.ResultWriter;
 import cn.trialfinder.search.FinderSearch;
+import cn.minecraftfinder.geode.dev.GeodeDevelopmentRunner;
 import net.fabricmc.api.DedicatedServerModInitializer;
 import net.fabricmc.fabric.api.event.lifecycle.v1.ServerLifecycleEvents;
 import net.minecraft.server.MinecraftServer;
@@ -12,6 +13,8 @@ import java.nio.file.Files;
 import java.nio.charset.StandardCharsets;
 import java.time.LocalDateTime;
 import java.time.format.DateTimeFormatter;
+import java.io.Reader;
+import java.util.Properties;
 
 public final class TrialSpawnerFinderMod implements DedicatedServerModInitializer {
     private static final DateTimeFormatter OUTPUT_TIMESTAMP =
@@ -19,10 +22,36 @@ public final class TrialSpawnerFinderMod implements DedicatedServerModInitialize
 
     @Override
     public void onInitializeServer() {
-        ServerLifecycleEvents.SERVER_STARTED.register(this::runSearch);
+        ServerLifecycleEvents.SERVER_STARTED.register(this::runSelectedFinder);
     }
 
-    private void runSearch(MinecraftServer server) {
+    private void runSelectedFinder(MinecraftServer server) {
+        try {
+            if (selectedFinder(Path.of("finder.properties")).equals("geode")) {
+                GeodeDevelopmentRunner.run(server);
+            } else {
+                runTrialSearch(server);
+            }
+        } catch (Exception e) {
+            System.err.println("读取 finder-type 失败：" + e.getMessage());
+            e.printStackTrace(System.err);
+            server.stop(false);
+        }
+    }
+
+    static String selectedFinder(Path configPath) throws Exception {
+        Properties properties = new Properties();
+        try (Reader reader = Files.newBufferedReader(configPath, StandardCharsets.UTF_8)) {
+            properties.load(reader);
+        }
+        String finder = properties.getProperty("finder-type", "trial-spawner").trim();
+        if (!finder.equals("trial-spawner") && !finder.equals("geode")) {
+            throw new IllegalArgumentException("finder-type 只能是 trial-spawner 或 geode");
+        }
+        return finder;
+    }
+
+    private void runTrialSearch(MinecraftServer server) {
         Path configPath = Path.of("finder.properties");
         Path outputPath = createOutputPath();
         Path failurePath = Path.of("search.failed");
