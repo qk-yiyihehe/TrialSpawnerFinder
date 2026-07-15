@@ -1,10 +1,12 @@
 .gradle/
 build/
 run/
+.runtime/
 .bootstrap-cache/
 results.csv
 results-*.csv
 results-*.txt
+geode-results-*.csv
 *.log
 .idea/
 .vscode/

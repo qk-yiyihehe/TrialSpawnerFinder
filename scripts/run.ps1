@@ -9,17 +9,24 @@ try {
     Start-Transcript -LiteralPath $logPath -Force | Out-Null
     Set-Location $project
 
-    $javaHomePath = Join-Path $project 'build\java-home.txt'
-    if (-not (Test-Path -LiteralPath $javaHomePath)) {
-        throw 'The build JDK was not recorded. Run setup.ps1 first.'
+    $javaHomePath = Join-Path $project '.runtime\build-java-home.txt'
+    $usingSetupJava = Test-Path -LiteralPath $javaHomePath
+    if ($usingSetupJava) {
+        $buildJavaHome = (Get-Content -LiteralPath $javaHomePath -Raw -Encoding UTF8).Trim()
+    } elseif ($env:JAVA_HOME -and (Test-Path (Join-Path $env:JAVA_HOME 'bin\java.exe'))) {
+        $buildJavaHome = $env:JAVA_HOME
+    } else {
+        $javaCommand = Get-Command java.exe -ErrorAction SilentlyContinue
+        if ($null -eq $javaCommand) {
+            throw 'Java was not found. Run setup.ps1 or install a Java 21 development JDK.'
+        }
+        $buildJavaHome = Split-Path -Parent (Split-Path -Parent $javaCommand.Source)
     }
-    $env:JAVA_HOME = (Get-Content -LiteralPath $javaHomePath -Raw -Encoding ASCII).Trim()
-    if (-not (Test-Path (Join-Path $env:JAVA_HOME 'bin\java.exe'))) {
-        throw 'The build JDK is no longer available. Run setup.ps1 again.'
+    if (-not (Test-Path (Join-Path $buildJavaHome 'bin\java.exe'))) {
+        throw 'The selected build JDK is no longer available. Run setup.ps1 again.'
     }
+    $env:JAVA_HOME = $buildJavaHome
     $env:Path = (Join-Path $env:JAVA_HOME 'bin') + ';' + $env:Path
-    $env:GRADLE_USER_HOME = 'C:\GradleCache'
-
     $jar = Join-Path $project 'build\libs\trial-spawner-finder-1.0.0.jar'
     if (-not (Test-Path $jar)) {
         throw 'The project has not been built. Run setup.ps1 first.'
@@ -46,7 +53,9 @@ try {
 } finally {
     try { Stop-Transcript | Out-Null } catch { }
     Write-Host ''
-    Read-Host 'Press Enter to close this window'
+    if (-not [Console]::IsInputRedirected) {
+        Read-Host 'Press Enter to close this window'
+    }
 }
 
 exit $exitCode
