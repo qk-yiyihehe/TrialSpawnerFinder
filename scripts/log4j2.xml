@@ -1,0 +1,41 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<Configuration status="WARN">
+    <Appenders>
+        <Console name="Console" target="SYSTEM_OUT">
+            <RegexFilter regex="^Cannot (push|pop).*profiler tick hasn't started.*$"
+                         onMatch="DENY" onMismatch="NEUTRAL"/>
+            <PatternLayout pattern="[%d{HH:mm:ss}] [%t/%level] (%logger{1}) %msg{nolookups}%n"/>
+        </Console>
+        <RollingRandomAccessFile name="LatestFile"
+                                 fileName="logs/latest.log"
+                                 filePattern="logs/%d{yyyy-MM-dd}-%i.log.gz">
+            <PatternLayout pattern="[%d{HH:mm:ss}] [%t/%level] (%logger{1}) %msg{nolookups}%n"/>
+            <Policies>
+                <TimeBasedTriggeringPolicy/>
+                <OnStartupTriggeringPolicy/>
+            </Policies>
+        </RollingRandomAccessFile>
+        <RollingRandomAccessFile name="DebugFile"
+                                 fileName="logs/debug.log"
+                                 filePattern="logs/debug-%i.log.gz">
+            <PatternLayout pattern="[%d{HH:mm:ss}] [%t/%level] (%logger) %msg{nolookups}%n"/>
+            <DefaultRolloverStrategy max="5" fileIndex="min"/>
+            <Policies>
+                <SizeBasedTriggeringPolicy size="200MB"/>
+                <OnStartupTriggeringPolicy/>
+            </Policies>
+        </RollingRandomAccessFile>
+    </Appenders>
+    <Loggers>
+        <Logger name="com.mojang.authlib.yggdrasil.YggdrasilServicesKeyInfo"
+                level="info" additivity="false">
+            <AppenderRef ref="LatestFile" level="info"/>
+            <AppenderRef ref="DebugFile" level="debug"/>
+        </Logger>
+        <Root level="debug">
+            <AppenderRef ref="Console" level="error"/>
+            <AppenderRef ref="LatestFile" level="info"/>
+            <AppenderRef ref="DebugFile" level="debug"/>
+        </Root>
+    </Loggers>
+</Configuration>
