@@ -3,7 +3,8 @@ package cn.minecraftfinder.geode.dev;
 import cn.minecraftfinder.geode.GeodeCandidate;
 import cn.minecraftfinder.geode.GeodeFinderConfig;
 import cn.minecraftfinder.geode.RandomTickFootprint;
-import cn.minecraftfinder.core.ProgressFormatter;
+import cn.minecraftfinder.core.ProgressReporter;
+import cn.minecraftfinder.core.ProgressUpdate;
 import net.minecraft.block.Blocks;
 import net.minecraft.server.world.ServerWorld;
 import net.minecraft.world.chunk.Chunk;
@@ -27,26 +28,22 @@ final class BatchMinecraftGeodeVerifier {
         this.footprint = config.randomTickFootprint();
     }
 
-    List<VerifiedGeodeCandidate> verify(List<GeodeCandidate> candidates) {
+    List<VerifiedGeodeCandidate> verify(
+            List<GeodeCandidate> candidates, ProgressReporter progress) {
         Set<Long> requiredChunks = requiredChunkKeys(candidates);
 
         System.out.println("真实验证需要生成 %,d 个去重区块。".formatted(requiredChunks.size()));
         Map<Long, Integer> buddingByChunk = new HashMap<>(Math.max(16, requiredChunks.size() * 2));
         int completed = 0;
-        int nextPercent = 5;
-        long startedNanos = System.nanoTime();
+        progress.report(ProgressUpdate.phase(
+                "真实验证", 0, requiredChunks.size(), "区块"));
         for (long chunkKey : requiredChunks) {
             int chunkX = (int) (chunkKey >> 32);
             int chunkZ = (int) chunkKey;
             buddingByChunk.put(chunkKey, countBudding(world.getChunk(chunkX, chunkZ)));
             completed++;
-            int percent = requiredChunks.isEmpty() ? 100 : completed * 100 / requiredChunks.size();
-            if (percent >= nextPercent || completed == requiredChunks.size()) {
-                System.out.println(ProgressFormatter.phase(
-                        "真实验证", completed, requiredChunks.size(), "区块",
-                        System.nanoTime() - startedNanos));
-                nextPercent = percent + 5;
-            }
+            progress.report(ProgressUpdate.phase(
+                    "真实验证", completed, requiredChunks.size(), "区块"));
         }
 
         List<VerifiedGeodeCandidate> results = new ArrayList<>(candidates.size());

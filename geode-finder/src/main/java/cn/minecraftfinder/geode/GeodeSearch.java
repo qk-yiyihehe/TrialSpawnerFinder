@@ -1,5 +1,8 @@
 package cn.minecraftfinder.geode;
 
+import cn.minecraftfinder.core.ProgressReporter;
+import cn.minecraftfinder.core.ProgressUpdate;
+
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
@@ -10,11 +13,11 @@ public final class GeodeSearch {
     }
 
     public static List<GeodeCandidate> search(GeodeFinderConfig config) {
-        return search(config, SearchProgress.NONE);
+        return search(config, ProgressReporter.NONE);
     }
 
     public static List<GeodeCandidate> search(
-            GeodeFinderConfig config, SearchProgress progress) {
+            GeodeFinderConfig config, ProgressReporter progress) {
         int activityRadius = config.minecraftVersion().isAtLeast(1, 21, 5)
                 ? config.simulationDistanceChunks()
                 : Math.ceilDiv(config.legacyRandomTickRadiusBlocks(), 16);
@@ -24,6 +27,7 @@ public final class GeodeSearch {
         Map<Long, GeodeSimulation> cache = new HashMap<>();
         List<GeodeCandidate> refined = new ArrayList<>();
         RandomTickFootprint footprint = config.randomTickFootprint();
+        progress.report(ProgressUpdate.phase("理论精排", 0, coarse.size(), "候选"));
 
         for (int candidateIndex = 0; candidateIndex < coarse.size(); candidateIndex++) {
             GeodeCandidate candidate = coarse.get(candidateIndex);
@@ -61,7 +65,8 @@ public final class GeodeSearch {
                 refined.add(new GeodeCandidate(
                         candidate.centerChunkX(), candidate.centerChunkZ(), activeGeodes, count));
             }
-            progress.report("理论精排", candidateIndex + 1, coarse.size(), "候选");
+            progress.report(ProgressUpdate.phase(
+                    "理论精排", candidateIndex + 1, coarse.size(), "候选"));
         }
         refined.sort(null);
         return List.copyOf(refined);

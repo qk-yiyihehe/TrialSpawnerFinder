@@ -19,16 +19,10 @@ public final class ResultWriter {
     }
 
     public static void write(Path path, List<SearchResult> results) throws IOException {
-        List<SearchResult> sorted = results.stream()
-                .collect(Collectors.groupingBy(SearchResult::structureCount))
-                .values().stream()
-                .flatMap(group -> group.stream().sorted().limit(100))
-                .sorted()
-                .toList();
-        List<List<String>> csvRows = new ArrayList<>(sorted.size());
-        List<List<String>> textRows = new ArrayList<>(sorted.size());
-        for (int index = 0; index < sorted.size(); index++) {
-            SearchResult result = sorted.get(index);
+        List<List<String>> csvRows = new ArrayList<>(results.size());
+        List<List<String>> textRows = new ArrayList<>(results.size());
+        for (int index = 0; index < results.size(); index++) {
+            SearchResult result = results.get(index);
             List<String> prefix = List.of(
                     Integer.toString(index + 1),
                     Long.toString(result.centerX()),

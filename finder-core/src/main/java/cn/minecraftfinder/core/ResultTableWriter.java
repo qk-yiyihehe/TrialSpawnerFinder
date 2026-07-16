@@ -21,37 +21,49 @@ public final class ResultTableWriter {
             List<String> headers,
             List<List<String>> csvRows,
             List<List<String>> textRows) throws IOException {
+        if (csvRows.size() != textRows.size()) {
+            throw new IllegalArgumentException("CSV 与对齐文本的结果行数不一致");
+        }
+        List<List<String>> checkedCsvRows = validateRows(headers, csvRows);
+        List<List<String>> checkedTextRows = validateRows(headers, textRows);
         try (BufferedWriter writer = Files.newBufferedWriter(csvPath, StandardCharsets.UTF_8)) {
             writer.write('\uFEFF');
             writer.write(String.join(";", headers));
             writer.newLine();
-            for (List<String> row : csvRows) {
+            for (List<String> row : checkedCsvRows) {
                 writer.write(String.join(";", row));
                 writer.newLine();
             }
         }
-        writeAligned(ResultFiles.textPath(csvPath), headers, textRows);
+        writeAligned(ResultFiles.textPath(csvPath), headers, checkedTextRows);
     }
 
-    private static void writeAligned(
-            Path path, List<String> headers, List<List<String>> rows) throws IOException {
-        int[] widths = headers.stream().mapToInt(ResultTableWriter::displayWidth).toArray();
+    private static List<List<String>> validateRows(
+            List<String> headers, List<List<String>> rows) {
         List<List<String>> copiedRows = new ArrayList<>(rows.size());
         for (List<String> source : rows) {
             List<String> row = List.copyOf(source);
             if (row.size() != headers.size()) {
                 throw new IllegalArgumentException("结果行列数与表头不一致");
             }
+            copiedRows.add(row);
+        }
+        return List.copyOf(copiedRows);
+    }
+
+    private static void writeAligned(
+            Path path, List<String> headers, List<List<String>> rows) throws IOException {
+        int[] widths = headers.stream().mapToInt(ResultTableWriter::displayWidth).toArray();
+        for (List<String> row : rows) {
             for (int column = 0; column < row.size(); column++) {
                 widths[column] = Math.max(widths[column], displayWidth(row.get(column)));
             }
-            copiedRows.add(row);
         }
 
         try (BufferedWriter writer = Files.newBufferedWriter(path, StandardCharsets.UTF_8)) {
             writer.write('\uFEFF');
             writeRow(writer, headers, widths, false);
-            for (List<String> row : copiedRows) {
+            for (List<String> row : rows) {
                 writeRow(writer, row, widths, true);
             }
         }

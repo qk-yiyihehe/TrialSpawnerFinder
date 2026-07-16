@@ -2,7 +2,8 @@ package cn.trialfinder.search;
 
 import cn.trialfinder.config.FinderConfig;
 import cn.minecraftfinder.core.BlockPoint;
-import cn.minecraftfinder.core.ProgressFormatter;
+import cn.minecraftfinder.core.ProgressReporter;
+import cn.minecraftfinder.core.ProgressUpdate;
 
 import java.util.ArrayList;
 import java.util.LinkedHashMap;
@@ -19,13 +20,18 @@ public final class ShardedClusterScanner {
     }
 
     public static ScanResult scan(FinderConfig config) {
+        return scan(config, ProgressReporter.NONE);
+    }
+
+    public static ScanResult scan(FinderConfig config, ProgressReporter progress) {
         List<Shard> shards = shards(config);
         Map<List<BlockPoint>, CircleClusters.StructureCluster> unique = new LinkedHashMap<>();
         long candidateCount = 0;
         int completed = 0;
         int nextReportPercent = 1;
-        long startedNanos = System.nanoTime();
         long estimatedCandidates = estimatedCandidateCount(config);
+        progress.report(ProgressUpdate.estimated(
+                "粗筛", 0, shards.size(), "个", 0, estimatedCandidates));
 
         try (ExecutorService executor = Executors.newFixedThreadPool(config.scanThreads())) {
             CompletionService<ShardResult> completion = new ExecutorCompletionService<>(executor);
@@ -46,8 +52,9 @@ public final class ShardedClusterScanner {
                 }
                 int percent = completed * 100 / shards.size();
                 if (completed == shards.size() || percent >= nextReportPercent) {
-                    System.out.println(progressLine(completed, shards.size(), candidateCount,
-                            estimatedCandidates, System.nanoTime() - startedNanos));
+                    progress.report(ProgressUpdate.estimated(
+                            "粗筛", completed, shards.size(), "个",
+                            candidateCount, estimatedCandidates));
                     while (nextReportPercent <= percent) {
                         nextReportPercent++;
                     }
@@ -112,12 +119,6 @@ public final class ShardedClusterScanner {
             case SQUARE -> 4;
         };
         return (long) config.clusterRadiusBlocks() * multiplier + 2;
-    }
-
-    static String progressLine(
-            int completed, int total, long candidates, long estimatedCandidates, long elapsedNanos) {
-        return ProgressFormatter.estimatedWork(
-                "粗筛", completed, total, candidates, estimatedCandidates, "个", elapsedNanos);
     }
 
     static long estimatedCandidateCount(FinderConfig config) {

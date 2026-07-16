@@ -1,5 +1,7 @@
 package cn.minecraftfinder.geode;
 
+import cn.minecraftfinder.core.ProgressReporter;
+import cn.minecraftfinder.core.ProgressUpdate;
 import cn.minecraftfinder.core.SearchBounds;
 
 import java.util.ArrayList;
@@ -16,11 +18,11 @@ final class GeodeWindowScanner {
     }
 
     static List<GeodeCandidate> scan(GeodeFinderConfig config, int windowRadiusChunks) {
-        return scan(config, windowRadiusChunks, SearchProgress.NONE);
+        return scan(config, windowRadiusChunks, ProgressReporter.NONE);
     }
 
     static List<GeodeCandidate> scan(
-            GeodeFinderConfig config, int windowRadiusChunks, SearchProgress progress) {
+            GeodeFinderConfig config, int windowRadiusChunks, ProgressReporter progress) {
         SearchBounds bounds = config.searchArea().bounds();
         int centerMinX = Math.floorDiv(Math.toIntExact(bounds.minX()), 16);
         int centerMaxX = Math.floorDiv(Math.toIntExact(bounds.maxX()), 16);
@@ -33,6 +35,7 @@ final class GeodeWindowScanner {
             return scanSlice(config, windowRadiusChunks,
                     centerMinX, centerMaxX, centerMinZ, centerMaxZ, progress);
         }
+        progress.report(ProgressUpdate.phase("粗筛", 0, sliceCount, "分片"));
 
         ExecutorService executor = Executors.newFixedThreadPool(
                 Math.min(config.scanThreads(), sliceCount));
@@ -42,7 +45,7 @@ final class GeodeWindowScanner {
                 int sliceMinZ = centerMinZ + index * shardHeight;
                 int sliceMaxZ = Math.min(centerMaxZ, sliceMinZ + shardHeight - 1);
                 futures.add(executor.submit(() -> scanSlice(config, windowRadiusChunks,
-                        centerMinX, centerMaxX, sliceMinZ, sliceMaxZ, SearchProgress.NONE)));
+                        centerMinX, centerMaxX, sliceMinZ, sliceMaxZ, ProgressReporter.NONE)));
             }
             PriorityQueue<GeodeCandidate> candidates = candidateQueue(config.prefilterLimit());
             for (int index = 0; index < futures.size(); index++) {
@@ -50,7 +53,7 @@ final class GeodeWindowScanner {
                 for (GeodeCandidate candidate : future.get()) {
                     offer(candidates, candidate, config.prefilterLimit());
                 }
-                progress.report("粗筛", index + 1, sliceCount, "分片");
+                progress.report(ProgressUpdate.phase("粗筛", index + 1, sliceCount, "分片"));
             }
             return sorted(candidates);
         } catch (InterruptedException e) {
@@ -70,7 +73,7 @@ final class GeodeWindowScanner {
             int centerMaxX,
             int centerMinZ,
             int centerMaxZ,
-            SearchProgress progress) {
+            ProgressReporter progress) {
         int sampleMinX = centerMinX - windowRadiusChunks;
         int sampleMaxX = centerMaxX + windowRadiusChunks;
         int sampleMinZ = centerMinZ - windowRadiusChunks;
@@ -83,6 +86,7 @@ final class GeodeWindowScanner {
         ModernGeodeSimulator simulator = new ModernGeodeSimulator(config.seed());
         int totalRows = sampleMaxZ - sampleMinZ + 1;
         int reportStep = Math.max(1, totalRows / 100);
+        progress.report(ProgressUpdate.phase("粗筛", 0, totalRows, "区块行"));
 
         for (int z = sampleMinZ; z <= sampleMaxZ; z++) {
             int row = Math.floorMod(z - sampleMinZ, diameter) * width;
@@ -114,7 +118,8 @@ final class GeodeWindowScanner {
             }
             int completedRows = z - sampleMinZ + 1;
             if (completedRows == totalRows || completedRows % reportStep == 0) {
-                progress.report("粗筛", completedRows, totalRows, "区块行");
+                progress.report(ProgressUpdate.phase(
+                        "粗筛", completedRows, totalRows, "区块行"));
             }
         }
         return sorted(candidates);

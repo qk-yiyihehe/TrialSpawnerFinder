@@ -8,6 +8,16 @@ public record SearchArea(
         boolean fullWorld,
         int worldLimit) {
 
+    public static SearchArea load(FinderProperties properties, int worldLimit) {
+        return new SearchArea(
+                properties.requiredInt("search-center-x"),
+                properties.requiredInt("search-center-z"),
+                properties.requiredInt("search-radius-blocks"),
+                AreaShape.parse(properties.optional("search-area-shape", "circle")),
+                properties.optionalBoolean("full-world", false),
+                worldLimit);
+    }
+
     public SearchArea {
         if (!fullWorld && radiusBlocks <= 0) {
             throw new IllegalArgumentException("普通搜索的搜索半径必须大于 0");

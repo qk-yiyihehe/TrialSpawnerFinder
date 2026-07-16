@@ -8,6 +8,8 @@ import java.nio.file.Path;
 import java.util.List;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertFalse;
+import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 class ResultTableWriterTest {
@@ -25,5 +27,16 @@ class ResultTableWriterTest {
         Path text = ResultFiles.textPath(csv);
         assertTrue(Files.exists(text));
         assertTrue(Files.readString(text).contains(" 20"));
+    }
+
+    @Test
+    void validatesRowsBeforeCreatingFiles() {
+        Path csv = directory.resolve("invalid.csv");
+
+        assertThrows(IllegalArgumentException.class, () -> ResultTableWriter.write(
+                csv, List.of("排名", "数量"), List.of(List.of("1"))));
+
+        assertFalse(Files.exists(csv));
+        assertFalse(Files.exists(ResultFiles.textPath(csv)));
     }
 }

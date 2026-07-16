@@ -17,7 +17,7 @@ class GeodeSearchTest {
         List<String> phases = new ArrayList<>();
 
         GeodeSearch.search(config(0, AreaShape.SQUARE, 50),
-                (phase, completed, total, unit) -> phases.add(phase));
+                update -> phases.add(update.phase()));
 
         assertTrue(phases.contains("粗筛"));
         assertTrue(phases.contains("理论精排"));

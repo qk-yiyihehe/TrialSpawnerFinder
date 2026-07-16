@@ -1,6 +1,7 @@
 package cn.trialfinder.search;
 
 import cn.minecraftfinder.core.AreaShape;
+import cn.minecraftfinder.core.ProgressUpdate;
 import cn.trialfinder.config.FinderConfig;
 import cn.minecraftfinder.core.BlockPoint;
 import org.junit.jupiter.api.Test;
@@ -13,11 +14,17 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 
 class ShardedClusterScannerTest {
     @Test
-    void progressShowsThroughputAndEstimatedTime() {
-        String progress = ShardedClusterScanner.progressLine(
-                25, 100, 500_000, 2_000_000, 10_000_000_000L);
+    void reportsEstimatedCandidateProgress() {
+        List<ProgressUpdate> progress = new java.util.ArrayList<>();
+        FinderConfig config = new FinderConfig(
+                0, 0, 0, 1_000, false, AreaShape.CIRCLE,
+                128, AreaShape.CIRCLE, 1, 0, 1, 2_000);
 
-        assertEquals("[粗筛 ##--------] 25% 25/100 | 500.0k 个 | 50.0k 个/秒 | ETA 00:00:30", progress);
+        ShardedClusterScanner.scan(config, progress::add);
+
+        assertEquals(0, progress.getFirst().completed());
+        assertTrue(progress.getFirst().hasEstimatedWork());
+        assertEquals("粗筛", progress.getLast().phase());
     }
 
     @Test

@@ -2,6 +2,7 @@ package cn.trialfinder.io;
 
 import cn.minecraftfinder.core.BlockPoint;
 import cn.trialfinder.model.SearchResult;
+import cn.trialfinder.model.TrialResultRanking;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
 
@@ -26,7 +27,7 @@ class ResultWriterTest {
         }
         Path output = directory.resolve("results.csv");
 
-        ResultWriter.write(output, results);
+        ResultWriter.write(output, TrialResultRanking.rank(results));
 
         List<String> lines = Files.readAllLines(output);
         assertEquals(101, lines.size());
@@ -49,7 +50,7 @@ class ResultWriterTest {
         }
         Path output = directory.resolve("groups.csv");
 
-        ResultWriter.write(output, results);
+        ResultWriter.write(output, TrialResultRanking.rank(results));
 
         List<String> lines = Files.readAllLines(output);
         assertEquals(301, lines.size());

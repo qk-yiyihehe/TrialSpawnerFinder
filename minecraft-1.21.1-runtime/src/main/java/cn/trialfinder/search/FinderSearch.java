@@ -3,9 +3,11 @@ package cn.trialfinder.search;
 import cn.trialfinder.config.FinderConfig;
 import cn.trialfinder.io.ResultWriter;
 import cn.minecraftfinder.core.BlockPoint;
-import cn.minecraftfinder.core.ProgressFormatter;
+import cn.minecraftfinder.core.ProgressReporter;
+import cn.minecraftfinder.core.ProgressUpdate;
 import cn.trialfinder.model.SearchResult;
 import cn.trialfinder.model.SpawnerPoint;
+import cn.trialfinder.model.TrialResultRanking;
 import cn.trialfinder.world.TrialChamberGenerator;
 import net.minecraft.server.world.ServerWorld;
 
@@ -30,11 +32,13 @@ import java.util.concurrent.atomic.AtomicInteger;
 public final class FinderSearch {
     private final FinderConfig config;
     private final Path output;
+    private final ProgressReporter progress;
     private final List<SearchResult> results = new ArrayList<>();
 
-    public FinderSearch(FinderConfig config, Path output) {
+    public FinderSearch(FinderConfig config, Path output, ProgressReporter progress) {
         this.config = config;
         this.output = output;
+        this.progress = progress;
     }
 
     public void run(ServerWorld world) throws IOException {
@@ -50,7 +54,7 @@ public final class FinderSearch {
                     config.searchMinZ(), config.searchMaxZ()));
         }
         System.out.println("分片边长：%,d 方块".formatted(config.scanShardSizeBlocks()));
-        ShardedClusterScanner.ScanResult scan = ShardedClusterScanner.scan(config);
+        ShardedClusterScanner.ScanResult scan = ShardedClusterScanner.scan(config, progress);
         System.out.println("找到 %,d 个随机分布候选。".formatted(scan.candidateCount()));
 
         System.out.println("[2/3] 合并分片聚类...");
@@ -66,17 +70,17 @@ public final class FinderSearch {
         System.out.println("精细生成实际线程：%d；唯一候选密室：%,d 座。".formatted(
                 threadCount, requiredStructures.size()));
         AtomicInteger generatedCount = new AtomicInteger();
-        AtomicInteger nextGenerationPercent = new AtomicInteger(1);
-        long generationStartedNanos = System.nanoTime();
+        progress.report(ProgressUpdate.phase(
+                "生成", 0, requiredStructures.size(), "座"));
         try (ExecutorService executor = Executors.newFixedThreadPool(threadCount)) {
             List<GenerationTask> tasks = new ArrayList<>(requiredStructures.size());
             for (BlockPoint point : requiredStructures) {
                 Future<?> future = executor.submit(() -> {
                     TrialChamberGenerator generator = new TrialChamberGenerator(world);
                     cache.put(point, generator.generate(point));
-                    printGenerationProgress(
-                            generatedCount.incrementAndGet(), requiredStructures.size(),
-                            generationStartedNanos, nextGenerationPercent);
+                    progress.report(ProgressUpdate.phase(
+                            "生成", generatedCount.incrementAndGet(),
+                            requiredStructures.size(), "座"));
                 });
                 tasks.add(new GenerationTask(point, future));
             }
@@ -99,9 +103,9 @@ public final class FinderSearch {
                 for (GenerationTask task : failed) {
                     try {
                         cache.put(task.point(), generator.generate(task.point()));
-                        printGenerationProgress(
-                                generatedCount.incrementAndGet(), requiredStructures.size(),
-                                generationStartedNanos, nextGenerationPercent);
+                        progress.report(ProgressUpdate.phase(
+                                "生成", generatedCount.incrementAndGet(),
+                                requiredStructures.size(), "座"));
                     } catch (RuntimeException e) {
                         throw new IllegalStateException(
                                 "密室 %d,%d 串行重试仍然失败".formatted(
@@ -114,8 +118,7 @@ public final class FinderSearch {
             throw new IllegalStateException("试炼密室生成被中断", e);
         }
 
-        long scoringStartedNanos = System.nanoTime();
-        int nextScoringPercent = 1;
+        progress.report(ProgressUpdate.phase("统计", 0, clusters.size(), "组"));
         for (int index = 0; index < clusters.size(); index++) {
             CircleClusters.StructureCluster cluster = clusters.get(index);
             List<TrialChamberGenerator.GeneratedChamber> chambers = cluster.structures().stream()
@@ -123,8 +126,8 @@ public final class FinderSearch {
                     .filter(TrialChamberGenerator.GeneratedChamber::exists)
                     .toList();
             if (chambers.size() < config.minStructures()) {
-                nextScoringPercent = printScoringProgress(
-                        index + 1, clusters.size(), scoringStartedNanos, nextScoringPercent);
+                progress.report(ProgressUpdate.phase(
+                        "统计", index + 1, clusters.size(), "组"));
                 continue;
             }
 
@@ -144,8 +147,8 @@ public final class FinderSearch {
                         centerX, centerZ, structures.size(), spawnerCount, structures);
                 unique.merge(structures, result, FinderSearch::betterResult);
             }
-            nextScoringPercent = printScoringProgress(
-                    index + 1, clusters.size(), scoringStartedNanos, nextScoringPercent);
+            progress.report(ProgressUpdate.phase(
+                    "统计", index + 1, clusters.size(), "组"));
         }
 
         refreshResults(unique);
@@ -162,49 +165,11 @@ public final class FinderSearch {
 
     private synchronized void refreshResults(Map<List<BlockPoint>, SearchResult> unique) {
         results.clear();
-        List<SearchResult> limited = unique.values().stream()
-                .collect(java.util.stream.Collectors.groupingBy(SearchResult::structureCount))
-                .values().stream()
-                .flatMap(group -> group.stream().sorted().limit(100))
-                .sorted()
-                .toList();
-        results.addAll(limited);
+        results.addAll(TrialResultRanking.rank(unique.values()));
     }
 
     private static SearchResult betterResult(SearchResult first, SearchResult second) {
         return first.compareTo(second) <= 0 ? first : second;
-    }
-
-    private static int printScoringProgress(
-            int completed, int total, long startedNanos, int nextPercent) {
-        if (total == 0) return nextPercent;
-        int percent = completed * 100 / total;
-        if (completed == total || percent >= nextPercent) {
-            System.out.println(phaseProgressLine(
-                    "统计", completed, total, "组", System.nanoTime() - startedNanos));
-            return percent + 1;
-        }
-        return nextPercent;
-    }
-
-    private static void printGenerationProgress(
-            int completed, int total, long startedNanos, AtomicInteger nextPercent) {
-        if (total == 0) return;
-        int percent = completed * 100 / total;
-        while (completed == total || percent >= nextPercent.get()) {
-            int expected = nextPercent.get();
-            if (expected > percent && completed != total) return;
-            if (nextPercent.compareAndSet(expected, Math.max(expected + 1, percent + 1))) {
-                System.out.println(phaseProgressLine(
-                        "生成", completed, total, "座", System.nanoTime() - startedNanos));
-                return;
-            }
-        }
-    }
-
-    static String phaseProgressLine(
-            String phase, int completed, int total, String unit, long elapsedNanos) {
-        return ProgressFormatter.phase(phase, completed, total, unit, elapsedNanos);
     }
 
     static int fineThreadCount(int availableProcessors) {
