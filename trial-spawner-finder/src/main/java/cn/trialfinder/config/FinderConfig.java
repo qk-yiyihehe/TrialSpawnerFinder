@@ -36,10 +36,10 @@ public record FinderConfig(
                 searchArea.radiusBlocks(),
                 searchArea.fullWorld(),
                 searchArea.shape(),
-                properties.requiredInt("cluster-radius-blocks"),
-                AreaShape.parse(properties.required("area-shape")),
-                properties.requiredInt("min-structures"),
-                properties.requiredInt("min-spawners"),
+                requiredInt(properties, "trial-cluster-radius-blocks", "cluster-radius-blocks"),
+                AreaShape.parse(required(properties, "trial-area-shape", "area-shape")),
+                requiredInt(properties, "trial-min-structures", "min-structures"),
+                requiredInt(properties, "trial-min-spawners", "min-spawners"),
                 scan.threads(),
                 scan.shardSizeBlocks());
         config.validate();
@@ -53,6 +53,14 @@ public record FinderConfig(
         if (minStructures <= 0 || minSpawners < 0) {
             throw new IllegalArgumentException("min-structures 必须大于 0，min-spawners 不能小于 0");
         }
+    }
+
+    private static String required(FinderProperties properties, String key, String legacyKey) {
+        return properties.contains(key) ? properties.required(key) : properties.required(legacyKey);
+    }
+
+    private static int requiredInt(FinderProperties properties, String key, String legacyKey) {
+        return properties.contains(key) ? properties.requiredInt(key) : properties.requiredInt(legacyKey);
     }
 
     public SearchBounds searchBounds() {
