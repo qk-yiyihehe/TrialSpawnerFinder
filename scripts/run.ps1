@@ -27,22 +27,22 @@ try {
     }
     $env:JAVA_HOME = $buildJavaHome
     $env:Path = (Join-Path $env:JAVA_HOME 'bin') + ';' + $env:Path
-    $jar = Join-Path $project 'build\libs\trial-spawner-finder-1.0.0.jar'
+    $jar = Join-Path $project 'minecraft-1.21.1-runtime\build\libs\minecraft-finders-1.21.1-1.0.0.jar'
     if (-not (Test-Path $jar)) {
         throw 'The project has not been built. Run setup.ps1 first.'
     }
 
     & (Join-Path $project 'scripts\prepare-run.ps1')
-    Write-Host "Starting TrialSpawnerFinder with $env:JAVA_HOME"
-    & (Join-Path $project 'gradlew.bat') runServer --console=plain
+    Write-Host "Starting MinecraftFinders with $env:JAVA_HOME"
+    & (Join-Path $project 'gradlew.bat') :minecraft-1.21.1-runtime:runServer --console=plain
     $exitCode = $LASTEXITCODE
     $failureMarker = Join-Path $project 'run\search.failed'
     if (Test-Path -LiteralPath $failureMarker) {
         $detail = Get-Content -LiteralPath $failureMarker -Raw -Encoding UTF8
-        throw "TrialSpawnerFinder search failed: $detail"
+        throw "MinecraftFinders search failed: $detail"
     }
     if ($exitCode -ne 0) {
-        throw "TrialSpawnerFinder exited with code $exitCode."
+        throw "MinecraftFinders exited with code $exitCode."
     }
     Write-Host 'Search completed successfully.'
 } catch {

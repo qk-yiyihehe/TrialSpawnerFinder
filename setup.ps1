@@ -30,7 +30,7 @@ Write-Host "Using JDK: $env:JAVA_HOME"
 
 Push-Location $project
 try {
-    & .\gradlew.bat clean test remapJar --console=plain
+    & .\gradlew.bat clean test :minecraft-1.21.1-runtime:remapJar --console=plain
     if ($LASTEXITCODE -ne 0) { throw "Gradle build failed with exit code $LASTEXITCODE" }
 
     New-Item -ItemType Directory -Force -Path '.runtime' | Out-Null

@@ -5,12 +5,24 @@ import cn.minecraftfinder.core.SearchArea;
 import org.junit.jupiter.api.Test;
 
 import java.util.List;
+import java.util.ArrayList;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 class GeodeSearchTest {
+    @Test
+    void reportsCoarseAndRefinementProgress() {
+        List<String> phases = new ArrayList<>();
+
+        GeodeSearch.search(config(0, AreaShape.SQUARE, 50),
+                (phase, completed, total, unit) -> phases.add(phase));
+
+        assertTrue(phases.contains("粗筛"));
+        assertTrue(phases.contains("理论精排"));
+    }
+
     @Test
     void runsTwoStageSearchAndReturnsRankedCandidates() {
         GeodeFinderConfig config = config(0, AreaShape.SQUARE, 500);

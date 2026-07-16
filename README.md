@@ -1,13 +1,13 @@
-# TrialSpawnerFinder
+# MinecraftFinders
 
-用于在 Minecraft Java 版 1.21.1 世界种子中查找试炼密室密集区域，并统计指定圆形半径内实际生成的试炼刷怪笼。
+用于在 Minecraft Java 版世界种子中运行多个独立查找器。当前开发环境支持试炼密室刷怪笼和紫水晶母岩。
 
 ## 使用方法
 
 1. 编辑 `finder.properties`，填写世界种子、搜索范围和阈值。
 2. 在项目目录打开 PowerShell，运行 `powershell -ExecutionPolicy Bypass -File ./setup.ps1` 完成首次构建。
 3. 双击 `run.bat` 开始搜索。
-4. 结果按刷怪笼数量降序保存为 `results-年月日-时分秒.csv`，不会覆盖以前的结果；同名 `.txt` 是适合记事本查看的对齐版本。
+4. 结果统一保存为 `results-查找器-年月日-时分秒.csv`，不会覆盖以前的结果；同名 `.txt` 是适合记事本查看的对齐版本。
 
 如果启动失败，窗口会保留错误信息，并将完整启动日志写入项目根目录的 `launcher.log`。
 
