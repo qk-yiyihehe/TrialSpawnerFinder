@@ -30,6 +30,11 @@ public final class FinderProperties {
         return value.trim();
     }
 
+    public boolean contains(String key) {
+        String value = values.getProperty(key);
+        return value != null && !value.isBlank();
+    }
+
     public String optional(String key, String fallback) {
         String value = values.getProperty(key);
         return value == null || value.isBlank() ? fallback : value.trim();

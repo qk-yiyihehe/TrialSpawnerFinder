@@ -42,6 +42,28 @@ class FinderConfigTest {
     }
 
     @Test
+    void loadsPrefixedTrialSettings() throws IOException {
+        Path file = directory.resolve("finder.properties");
+        Files.writeString(file, """
+                seed=1
+                search-center-x=0
+                search-center-z=0
+                search-radius-blocks=1000
+                trial-cluster-radius-blocks=192
+                trial-area-shape=square
+                trial-min-structures=3
+                trial-min-spawners=24
+                """);
+
+        FinderConfig config = FinderConfig.load(file);
+
+        assertEquals(192, config.clusterRadiusBlocks());
+        assertEquals(AreaShape.SQUARE, config.areaShape());
+        assertEquals(3, config.minStructures());
+        assertEquals(24, config.minSpawners());
+    }
+
+    @Test
     void supportsSquareOuterSearchArea() throws IOException {
         Path file = directory.resolve("finder.properties");
         Files.writeString(file, """
