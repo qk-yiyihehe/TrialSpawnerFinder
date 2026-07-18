@@ -137,7 +137,7 @@ public final class FinderSearch {
                                 throw new UncheckedIOException(e);
                             }
                             progress.report(ProgressUpdate.phase(
-                                    "验证", checkpoint.completedCount(), batch.shardCount(), "片"));
+                                    "总进度", checkpoint.completedCount(), batch.shardCount(), "片"));
                             reportStatus(batch.shardCount(), predictionState, verifiedStructures[0]);
                         });
                 if (predictors != null) {
@@ -162,18 +162,11 @@ public final class FinderSearch {
         int percent = shardCount == 0 ? 100 : completed * 100 / shardCount;
         if (completed != shardCount && percent <= lastStatusPercent) return;
         lastStatusPercent = percent;
-        List<SearchResult> current = accumulatedResults.results();
-        String first = current.isEmpty()
-                ? "暂无"
-                : "%d 个刷怪笼 @ %d,%d".formatted(
-                        current.getFirst().spawnerCount(),
-                        current.getFirst().centerX(), current.getFirst().centerZ());
         System.out.println((
                 "状态：已扫描候选 %,d；预测聚类 %,d；裁剪 %,d；原版验证 %,d 座；"
-                        + "当前第一名 %s；检查点 %,d/%,d。")
+                        + "检查点 %,d/%,d。")
                 .formatted(state.scannedCandidates, state.predictedClusters,
-                        state.prunedClusters, verifiedStructures, first,
-                        completed, shardCount));
+                        state.prunedClusters, verifiedStructures, completed, shardCount));
     }
 
     private static TrialSearchCheckpoint.Statistics statistics(

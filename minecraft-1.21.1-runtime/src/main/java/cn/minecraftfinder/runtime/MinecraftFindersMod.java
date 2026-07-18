@@ -1,8 +1,6 @@
 package cn.minecraftfinder.runtime;
 
-import cn.minecraftfinder.core.FinderProperties;
 import cn.minecraftfinder.core.ResultFiles;
-import cn.minecraftfinder.geode.dev.GeodeDevelopmentRunner;
 import cn.trialfinder.config.FinderConfig;
 import cn.trialfinder.search.FinderSearch;
 import net.fabricmc.api.DedicatedServerModInitializer;
@@ -21,24 +19,10 @@ public final class MinecraftFindersMod implements DedicatedServerModInitializer 
 
     private void runSelectedFinder(MinecraftServer server) {
         try {
-            String finder = selectedFinder(CONFIG_PATH);
-            if (finder.equals("geode")) {
-                FinderExecution.run(server, "紫水晶母岩", () -> GeodeDevelopmentRunner.run(server));
-            } else {
-                FinderExecution.run(server, "试炼刷怪笼", () -> runTrialSearch(server));
-            }
+            FinderExecution.run(server, "试炼刷怪笼", () -> runTrialSearch(server));
         } catch (Exception e) {
-            FinderExecution.run(server, "读取 finder-type", () -> { throw e; });
+            FinderExecution.run(server, "读取试炼刷怪笼配置", () -> { throw e; });
         }
-    }
-
-    static String selectedFinder(Path configPath) throws Exception {
-        String finder = FinderProperties.load(configPath)
-                .optional("finder-type", "trial-spawner");
-        if (!finder.equals("trial-spawner") && !finder.equals("geode")) {
-            throw new IllegalArgumentException("finder-type 只能是 trial-spawner 或 geode");
-        }
-        return finder;
     }
 
     private void runTrialSearch(MinecraftServer server) throws Exception {

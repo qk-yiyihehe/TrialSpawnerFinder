@@ -23,10 +23,8 @@ repositories {
 dependencies {
     implementation project(':finder-core')
     implementation project(':trial-spawner-finder')
-    implementation project(':geode-finder')
     include project(':finder-core')
     include project(':trial-spawner-finder')
-    include project(':geode-finder')
 
     minecraft "com.mojang:minecraft:${rootProject.minecraft_version}"
     mappings "net.fabricmc:yarn:${rootProject.yarn_mappings}:v2"
@@ -47,4 +45,11 @@ java {
 
 test {
     maxParallelForks = 1
+}
+
+tasks.named('runServer').configure {
+    def runtimeJava = providers.gradleProperty('runtimeJavaExecutable')
+    if (runtimeJava.isPresent()) {
+        executable = runtimeJava.get()
+    }
 }

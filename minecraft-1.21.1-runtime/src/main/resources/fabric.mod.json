@@ -3,7 +3,7 @@
   "id": "trial-spawner-finder",
   "version": "${version}",
   "name": "Minecraft Finders",
-  "description": "Runs trial spawner and geode finders with Minecraft 1.21.1 world generation.",
+  "description": "Runs the trial spawner finder with Minecraft 1.21.1 world generation.",
   "environment": "server",
   "entrypoints": {
     "server": [

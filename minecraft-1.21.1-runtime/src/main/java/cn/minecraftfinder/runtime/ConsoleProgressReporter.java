@@ -5,31 +5,23 @@ import cn.minecraftfinder.core.ProgressReporter;
 import cn.minecraftfinder.core.ProgressUpdate;
 
 public final class ConsoleProgressReporter implements ProgressReporter {
-    private String activePhase = "";
-    private long phaseStartedNanos;
+    private long searchStartedNanos;
     private int nextPercent = 1;
 
     @Override
     public synchronized void report(ProgressUpdate update) {
         if (update.total() == 0) return;
-        if (!update.phase().equals(activePhase)) {
-            activePhase = update.phase();
-            phaseStartedNanos = System.nanoTime();
-            nextPercent = 1;
+        if (searchStartedNanos == 0) {
+            searchStartedNanos = System.nanoTime();
         }
+        // 粗筛数据由状态行显示；控制台只保留一条跨阶段的总进度条。
+        if ("粗筛".equals(update.phase())) return;
         int percent = (int) (update.completed() * 100 / update.total());
         if (update.completed() != update.total() && percent < nextPercent) return;
 
-        long elapsedNanos = update.elapsedNanos() >= 0
-                ? update.elapsedNanos()
-                : System.nanoTime() - phaseStartedNanos;
-        String line = update.hasEstimatedWork()
-                ? ProgressFormatter.estimatedWork(
-                        update.phase(), update.completed(), update.total(),
-                        update.processed(), update.estimatedWork(), update.unit(), elapsedNanos)
-                : ProgressFormatter.phase(
-                        update.phase(), update.completed(), update.total(),
-                        update.unit(), elapsedNanos);
+        long elapsedNanos = System.nanoTime() - searchStartedNanos;
+        String line = ProgressFormatter.phase(
+                update.phase(), update.completed(), update.total(), update.unit(), elapsedNanos);
         System.out.println(line);
         nextPercent = percent + 1;
     }

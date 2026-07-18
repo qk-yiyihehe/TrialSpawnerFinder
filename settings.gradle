@@ -9,6 +9,5 @@ pluginManagement {
 rootProject.name = 'MinecraftFinders'
 
 include 'finder-core'
-include 'geode-finder'
 include 'trial-spawner-finder'
 include 'minecraft-1.21.1-runtime'

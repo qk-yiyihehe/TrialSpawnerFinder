@@ -1,6 +1,6 @@
 # MinecraftFinders
 
-用于在 Minecraft Java 版世界种子中运行多个独立查找器。当前开发环境支持试炼密室刷怪笼和紫水晶母岩。
+用于在 Minecraft Java 版世界种子中搜索试炼密室刷怪笼。
 
 ## 使用方法
 
@@ -29,6 +29,6 @@
 
 快速搜索按分片流式处理，不会将整个搜索范围的候选一次性装入内存。`scan-threads` 控制并行快速扫描线程数，试炼密室的实际分片完全由程序内部调度。4 GB 内存建议使用不超过 8 个扫描线程。
 
-开发构建需要 JDK 21。`setup.ps1` 会从 `JDK21_HOME`、`JAVA_HOME`、PATH 或 Minecraft Runtime 中选择可用的 JDK 并记录其路径，之后 `run.bat` 继续使用同一套 Java；开发环境不要求 GraalVM。启动脚本会自动写入临时服务端所需的 `eula=true`。
+开发构建固定使用 JDK 21。`setup.ps1` 会从 `JDK21_HOME`、`JAVA_HOME`、PATH 或 Minecraft Runtime 中选择构建 JDK，并单独寻找 GraalVM 25（可通过 `GRAALVM25_HOME` 指定，默认检查 `D:\#我的世界小工具\java`）。`run.bat` 只使用记录在 `.runtime\runtime-java-home.txt` 中的 GraalVM 25，构建 Java 和运行 Java 互不影响。启动脚本会自动写入临时服务端所需的 `eula=true`。
 
 开发者可阅读 [`docs/architecture.md`](docs/architecture.md)，了解公共搜索核心与各类查找器的模块边界。
