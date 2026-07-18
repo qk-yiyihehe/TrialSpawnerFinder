@@ -8,6 +8,10 @@ import java.util.Collection;
 import java.util.List;
 
 public final class ExactCenterOptimizer {
+    // Keep auxiliary memory bounded when callers use unusually large radii.
+    private static final int MAX_CIRCLE_LOOKUP_RADIUS = 1_000_000;
+    private static volatile CircleHorizontalCache circleHorizontalCache;
+
     private ExactCenterOptimizer() {
     }
 
@@ -17,15 +21,19 @@ public final class ExactCenterOptimizer {
         int maxZ = structures.stream().mapToInt(BlockPoint::z).min().orElseThrow() + radius;
         CenterScore best = null;
         long radiusSquared = (long) radius * radius;
+        int[] circleHorizontal = shape == AreaShape.CIRCLE
+                ? circleHorizontalLookup(radius) : null;
 
         for (int z = minZ; z <= maxZ; z++) {
-            IntRange legal = legalXRange(shape, radius, radiusSquared, structures, z);
+            IntRange legal = legalXRange(
+                    shape, radius, radiusSquared, circleHorizontal, structures, z);
             if (legal == null) continue;
 
             int[] difference = new int[legal.max() - legal.min() + 2];
             for (SpawnerPoint spawner : spawners) {
                 IntRange covered = coveredXRange(
-                        shape, radius, radiusSquared, spawner.x(), spawner.z(), z);
+                        shape, radius, radiusSquared, circleHorizontal,
+                        spawner.x(), spawner.z(), z);
                 if (covered == null) continue;
                 int from = Math.max(legal.min(), covered.min());
                 int to = Math.min(legal.max(), covered.max());
@@ -47,12 +55,14 @@ public final class ExactCenterOptimizer {
     }
 
     private static IntRange legalXRange(AreaShape shape, int radius, long radiusSquared,
-                                        List<BlockPoint> structures, int centerZ) {
+                                        int[] circleHorizontal, List<BlockPoint> structures,
+                                        int centerZ) {
         int min = Integer.MIN_VALUE;
         int max = Integer.MAX_VALUE;
         for (BlockPoint structure : structures) {
             IntRange range = coveredXRange(
-                    shape, radius, radiusSquared, structure.x(), structure.z(), centerZ);
+                    shape, radius, radiusSquared, circleHorizontal,
+                    structure.x(), structure.z(), centerZ);
             if (range == null) return null;
             min = Math.max(min, range.min());
             max = Math.min(max, range.max());
@@ -62,14 +72,37 @@ public final class ExactCenterOptimizer {
     }
 
     private static IntRange coveredXRange(AreaShape shape, int radius, long radiusSquared,
-                                          int pointX, int pointZ, int centerZ) {
+                                          int[] circleHorizontal, int pointX, int pointZ,
+                                          int centerZ) {
         long dz = (long) pointZ - centerZ;
-        if (Math.abs(dz) > radius) return null;
+        long absDz = Math.abs(dz);
+        if (absDz > radius) return null;
         int horizontal = switch (shape) {
-            case CIRCLE -> floorSqrt(radiusSquared - dz * dz);
+            case CIRCLE -> circleHorizontal == null
+                    ? floorSqrt(radiusSquared - dz * dz)
+                    : circleHorizontal[(int) absDz];
             case SQUARE -> radius;
         };
         return new IntRange(pointX - horizontal, pointX + horizontal);
+    }
+
+    private static int[] buildCircleHorizontalLookup(int radius) {
+        if (radius < 0 || radius > MAX_CIRCLE_LOOKUP_RADIUS) return null;
+        int[] horizontal = new int[radius + 1];
+        long radiusSquared = (long) radius * radius;
+        for (int dz = 0; dz <= radius; dz++) {
+            horizontal[dz] = floorSqrt(radiusSquared - (long) dz * dz);
+        }
+        return horizontal;
+    }
+
+    private static int[] circleHorizontalLookup(int radius) {
+        if (radius < 0 || radius > MAX_CIRCLE_LOOKUP_RADIUS) return null;
+        CircleHorizontalCache cached = circleHorizontalCache;
+        if (cached != null && cached.radius() == radius) return cached.values();
+        int[] values = buildCircleHorizontalLookup(radius);
+        circleHorizontalCache = new CircleHorizontalCache(radius, values);
+        return values;
     }
 
     private static int floorSqrt(long value) {
@@ -90,5 +123,8 @@ public final class ExactCenterOptimizer {
     }
 
     private record IntRange(int min, int max) {
+    }
+
+    private record CircleHorizontalCache(int radius, int[] values) {
     }
 }
