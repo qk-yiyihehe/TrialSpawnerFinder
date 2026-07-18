@@ -20,7 +20,9 @@ public final class ConsoleProgressReporter implements ProgressReporter {
         int percent = (int) (update.completed() * 100 / update.total());
         if (update.completed() != update.total() && percent < nextPercent) return;
 
-        long elapsedNanos = System.nanoTime() - phaseStartedNanos;
+        long elapsedNanos = update.elapsedNanos() >= 0
+                ? update.elapsedNanos()
+                : System.nanoTime() - phaseStartedNanos;
         String line = update.hasEstimatedWork()
                 ? ProgressFormatter.estimatedWork(
                         update.phase(), update.completed(), update.total(),
