@@ -18,11 +18,7 @@ public final class MinecraftFindersMod implements DedicatedServerModInitializer 
     }
 
     private void runSelectedFinder(MinecraftServer server) {
-        try {
-            FinderExecution.run(server, "试炼刷怪笼", () -> runTrialSearch(server));
-        } catch (Exception e) {
-            FinderExecution.run(server, "读取试炼刷怪笼配置", () -> { throw e; });
-        }
+        FinderExecution.run(server, "试炼刷怪笼", () -> runTrialSearch(server));
     }
 
     private void runTrialSearch(MinecraftServer server) throws Exception {
@@ -51,6 +47,9 @@ public final class MinecraftFindersMod implements DedicatedServerModInitializer 
 
     private static Path createOutputPath() {
         String configured = System.getProperty("minecraftfinders.output");
+        if (configured == null || configured.isBlank()) {
+            configured = System.getProperty("trialfinder.output");
+        }
         return configured == null || configured.isBlank()
                 ? ResultFiles.next(Path.of(".."), "trial-spawner")
                 : ResultFiles.next(Path.of(configured));
