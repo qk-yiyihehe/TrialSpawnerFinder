@@ -45,10 +45,12 @@ function Test-Java21([string]$JavaPath) {
 $project = Split-Path -Parent (Split-Path -Parent $MyInvocation.MyCommand.Path)
 $logPath = Join-Path $project 'launcher.log'
 $exitCode = 1
+$progressRenderer = Join-Path $project 'scripts\progress-renderer.ps1'
 
 try {
     Start-Transcript -LiteralPath $logPath -Force | Out-Null
     Set-Location $project
+    . $progressRenderer
 
     $runtimeJavaPath = Join-Path $project '.runtime\runtime-java-home.txt'
     if (-not (Test-Path -LiteralPath $runtimeJavaPath)) {
@@ -109,9 +111,25 @@ try {
 
     & (Join-Path $project 'scripts\prepare-run.ps1')
     Write-Host "Starting MinecraftFinders with runtime GraalVM 25: $runtimeJavaHome"
-    & (Join-Path $project 'gradlew.bat') :minecraft-1.21.1-runtime:runServer `
-        "-PruntimeJavaExecutable=$runtimeJava" --console=plain
-    $exitCode = $LASTEXITCODE
+    $savedErrorActionPreference = $ErrorActionPreference
+    try {
+        $ErrorActionPreference = 'Continue'
+        & (Join-Path $project 'gradlew.bat') :minecraft-1.21.1-runtime:runServer `
+            "-PruntimeJavaExecutable=$runtimeJava" --console=plain 2>&1 |
+            ForEach-Object {
+                $line = $_.ToString()
+                $event = ConvertFrom-FinderProgressLine $line
+                if ($null -ne $event) {
+                    Write-FinderProgressEvent $event
+                } elseif ($line -ne 'System.Management.Automation.RemoteException') {
+                    Write-FinderConsoleLine $line
+                }
+            }
+        $exitCode = $LASTEXITCODE
+    } finally {
+        $ErrorActionPreference = $savedErrorActionPreference
+    }
+    Close-FinderProgressDisplay
     $failureMarker = Join-Path $project 'run\search.failed'
     if (Test-Path -LiteralPath $failureMarker) {
         $detail = Get-Content -LiteralPath $failureMarker -Raw -Encoding UTF8
@@ -127,6 +145,9 @@ try {
     Write-Host ('Full launcher log: ' + $logPath)
     $exitCode = 1
 } finally {
+    if (Get-Command Close-FinderProgressDisplay -ErrorAction SilentlyContinue) {
+        Close-FinderProgressDisplay
+    }
     try { Stop-Transcript | Out-Null } catch { }
     Write-Host ''
     if (-not [Console]::IsInputRedirected) {
