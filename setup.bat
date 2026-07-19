@@ -1,4 +1,4 @@
-﻿@echo off
+@echo off
 chcp 65001 >nul
 setlocal EnableExtensions EnableDelayedExpansion
 cd /d "%~dp0"
@@ -69,6 +69,7 @@ if defined JAVA_EXE goto java_ready
 
 echo [1/4] 正在下载 GraalVM 25，约 346 MB...
 call :download_jdk "%JDK_ZIP%"
+if errorlevel 200 goto download_in_use
 if errorlevel 1 goto java_download_fallback
 if exist "%JAVA_DIR%" rmdir /s /q "%JAVA_DIR%"
 mkdir "%JAVA_DIR%"
@@ -117,6 +118,7 @@ if errorlevel 1 (
     if exist "%SERVER_JAR%" del /q "%SERVER_JAR%"
     echo 优先使用 BMCLAPI 国内镜像；持续低速或超过 90 秒时自动切换 Mojang 官方源。
     call :download_server "%SERVER_JAR%"
+    if errorlevel 200 goto download_in_use
     if errorlevel 1 goto download_failed
     call :verify_sha1 "%SERVER_JAR%" "%SERVER_SHA1%"
     if errorlevel 1 goto server_hash_failed
@@ -147,6 +149,7 @@ exit /b 0
 :download_jdk
 powershell.exe -NoProfile -ExecutionPolicy Bypass -File "%DOWNLOAD_SCRIPT%" -Url "!JDK_MIRROR!" -OutputPath "%~1" -Retry 2 -ConnectTimeout 20
 if not errorlevel 1 exit /b 0
+if errorlevel 200 exit /b 200
 if exist "%~1" del /q "%~1"
 echo 清华镜像失败，正在尝试 Oracle 官方源...
 powershell.exe -NoProfile -ExecutionPolicy Bypass -File "%DOWNLOAD_SCRIPT%" -Url "!JDK_FALLBACK!" -OutputPath "%~1" -Retry 3 -ConnectTimeout 20
@@ -156,12 +159,15 @@ exit /b %ERRORLEVEL%
 set "SERVER_PART=%~1.part"
 powershell.exe -NoProfile -ExecutionPolicy Bypass -File "%DOWNLOAD_SCRIPT%" -Url "!SERVER_MIRROR!" -OutputPath "!SERVER_PART!" -ExpectedBytes !SERVER_SIZE! -Retry 1 -ConnectTimeout 15 -SpeedLimit 131072 -SpeedTime 15 -MaxTime 90 -Resume
 if not errorlevel 1 goto download_server_done
+if errorlevel 200 exit /b 200
 echo 国内镜像当前过慢或连接失败，正在从 Mojang 官方源断点续传...
 powershell.exe -NoProfile -ExecutionPolicy Bypass -File "%DOWNLOAD_SCRIPT%" -Url "!SERVER_FALLBACK!" -OutputPath "!SERVER_PART!" -ExpectedBytes !SERVER_SIZE! -Retry 3 -ConnectTimeout 20 -SpeedLimit 32768 -SpeedTime 30 -Resume
+if errorlevel 200 exit /b 200
 if errorlevel 1 (
     echo 官方源不支持当前断点或连接失败，正在从官方源重新下载...
     if exist "!SERVER_PART!" del /q "!SERVER_PART!"
     powershell.exe -NoProfile -ExecutionPolicy Bypass -File "%DOWNLOAD_SCRIPT%" -Url "!SERVER_FALLBACK!" -OutputPath "!SERVER_PART!" -ExpectedBytes !SERVER_SIZE! -Retry 3 -ConnectTimeout 20 -SpeedLimit 32768 -SpeedTime 30
+    if errorlevel 200 exit /b 200
     if errorlevel 1 (
         if exist "!SERVER_PART!" del /q "!SERVER_PART!"
         exit /b 1
@@ -225,6 +231,10 @@ goto failed
 
 :download_failed
 echo ERROR: 下载失败，请检查网络后重新运行 setup.bat。
+goto failed
+
+:download_in_use
+echo ERROR: 下载文件正被其他进程占用，请关闭其他 setup.bat 或 curl.exe 后重新运行。
 goto failed
 
 :server_hash_failed

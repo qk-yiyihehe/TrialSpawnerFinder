@@ -21,12 +21,30 @@ function Quote-Argument([string]$Value) {
     return '"' + $Value.Replace('"', '\"') + '"'
 }
 
+function Test-OutputUnlocked([string]$Path) {
+    if (-not (Test-Path -LiteralPath $Path)) {
+        return $true
+    }
+    try {
+        $stream = [IO.File]::Open(
+            $Path, [IO.FileMode]::Open, [IO.FileAccess]::ReadWrite, [IO.FileShare]::None)
+        $stream.Dispose()
+        return $true
+    } catch [IO.IOException] {
+        return $false
+    }
+}
+
 function Get-ResponseLength([string]$HeaderPath, [long]$InitialBytes) {
     if (-not (Test-Path -LiteralPath $HeaderPath)) {
         return 0L
     }
 
-    $headers = [IO.File]::ReadAllText($HeaderPath)
+    try {
+        $headers = [IO.File]::ReadAllText($HeaderPath)
+    } catch [IO.IOException] {
+        return 0L
+    }
     $ranges = [regex]::Matches($headers, '(?im)^content-range:\s*bytes\s+\d+-\d+/(\d+)\s*$')
     if ($ranges.Count -gt 0) {
         return [long]$ranges[$ranges.Count - 1].Groups[1].Value
@@ -48,16 +66,18 @@ $outputDirectory = Split-Path -Parent $OutputPath
 if ($outputDirectory -and -not (Test-Path -LiteralPath $outputDirectory)) {
     New-Item -ItemType Directory -Force -Path $outputDirectory | Out-Null
 }
+if (-not (Test-OutputUnlocked $OutputPath)) {
+    [Console]::Error.WriteLine("下载文件正被其他进程占用：$OutputPath")
+    [Console]::Error.WriteLine('请关闭其他 setup.bat 或 curl.exe 后重新运行。')
+    exit 200
+}
 
 $initialBytes = 0L
 if ($Resume -and (Test-Path -LiteralPath $OutputPath)) {
     $initialBytes = (Get-Item -LiteralPath $OutputPath).Length
 }
 
-$headerPath = "$OutputPath.headers"
-if (Test-Path -LiteralPath $headerPath) {
-    Remove-Item -LiteralPath $headerPath -Force
-}
+$headerPath = "$OutputPath.$PID.$([Guid]::NewGuid().ToString('N')).headers"
 
 $baseCurlArguments = @('-sS', '-fL', '--connect-timeout', $ConnectTimeout)
 if ($SpeedLimit -gt 0 -and $SpeedTime -gt 0) {
@@ -132,17 +152,24 @@ try {
 
         $process = [Diagnostics.Process]::new()
         $process.StartInfo = $startInfo
+        $started = $false
         try {
             if (-not $process.Start()) {
                 $exitCode = 1
                 break
             }
+            $started = $true
+            $standardError = $process.StandardError.ReadToEndAsync()
             while (-not $process.WaitForExit(500)) {
                 Write-DownloadProgress $false $false
             }
             $exitCode = $process.ExitCode
-            $lastError = $process.StandardError.ReadToEnd().Trim()
+            $lastError = $standardError.GetAwaiter().GetResult().Trim()
         } finally {
+            if ($started -and -not $process.HasExited) {
+                $process.Kill()
+                $process.WaitForExit()
+            }
             $process.Dispose()
         }
 
@@ -162,6 +189,6 @@ try {
     exit $exitCode
 } finally {
     if (Test-Path -LiteralPath $headerPath) {
-        Remove-Item -LiteralPath $headerPath -Force
+        [IO.File]::Delete($headerPath)
     }
 }

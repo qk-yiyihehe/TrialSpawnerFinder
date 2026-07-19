@@ -11,7 +11,10 @@
     [string]$LogConfiguration,
 
     [Parameter(Mandatory = $true)]
-    [string]$ResultPath
+    [string]$OutputDirectory,
+
+    [Parameter(Mandatory = $true)]
+    [string]$LauncherLog
 )
 
 $ErrorActionPreference = 'Stop'
@@ -20,6 +23,42 @@ $ErrorActionPreference = 'Stop'
 function Quote-Argument([string]$Value) {
     return '"' + $Value.Replace('"', '\"') + '"'
 }
+
+Add-Type -TypeDefinition @'
+using System;
+using System.Threading;
+
+public static class TrialFinderConsoleCancellation
+{
+    private static int requested;
+
+    public static bool Requested
+    {
+        get { return Volatile.Read(ref requested) != 0; }
+    }
+
+    public static void Install()
+    {
+        Volatile.Write(ref requested, 0);
+        Console.CancelKeyPress += OnCancel;
+    }
+
+    public static void Uninstall()
+    {
+        Console.CancelKeyPress -= OnCancel;
+    }
+
+    private static void OnCancel(object sender, ConsoleCancelEventArgs eventArgs)
+    {
+        if (Interlocked.Exchange(ref requested, 1) == 0)
+        {
+            eventArgs.Cancel = true;
+            Console.Error.WriteLine();
+            Console.Error.WriteLine("Stop requested; waiting for Java to save progress...");
+        }
+    }
+}
+'@
 
 $arguments = @()
 if ($QuietArgument) {
@@ -32,7 +71,7 @@ $arguments += @(
     '-Dstdout.encoding=UTF-8',
     '-Dstderr.encoding=UTF-8',
     "-Dlog4j.configurationFile=$LogConfiguration",
-    "-Dtrialfinder.output=$ResultPath",
+    "-Dminecraftfinders.outputDirectory=$OutputDirectory",
     '-jar',
     'fabric-server-launch.jar',
     'nogui'
@@ -44,20 +83,39 @@ $startInfo.WorkingDirectory = $WorkingDirectory
 $startInfo.Arguments = (($arguments | ForEach-Object { Quote-Argument ([string]$_) }) -join ' ')
 $startInfo.UseShellExecute = $false
 $startInfo.RedirectStandardOutput = $true
+$startInfo.RedirectStandardError = $true
 $startInfo.StandardOutputEncoding = [Text.UTF8Encoding]::new($false)
+$startInfo.StandardErrorEncoding = [Text.UTF8Encoding]::new($false)
 
 $process = [Diagnostics.Process]::new()
 $process.StartInfo = $startInfo
+$processStarted = $false
+$processExitCode = 1
 $firstLine = [Text.StringBuilder]::new()
 $firstLineHandled = $false
 $buffer = [char[]]::new(4096)
+$logDirectory = Split-Path -Parent $LauncherLog
+if ($logDirectory -and -not (Test-Path -LiteralPath $logDirectory)) {
+    New-Item -ItemType Directory -Force -Path $logDirectory | Out-Null
+}
+$logWriter = [IO.StreamWriter]::new(
+    $LauncherLog, $false, [Text.UTF8Encoding]::new($false))
+[TrialFinderConsoleCancellation]::Install()
 
 try {
+    $logWriter.WriteLine('Java: ' + $JavaPath)
+    $logWriter.WriteLine('Working directory: ' + $WorkingDirectory)
+    $logWriter.WriteLine('Started: ' + [DateTimeOffset]::Now.ToString('O'))
+    $logWriter.Flush()
     if (-not $process.Start()) {
         exit 1
     }
+    $processStarted = $true
+    $standardError = $process.StandardError.ReadToEndAsync()
 
     while (($read = $process.StandardOutput.Read($buffer, 0, $buffer.Length)) -gt 0) {
+        $logWriter.Write($buffer, 0, $read)
+        $logWriter.Flush()
         if ($firstLineHandled) {
             [Console]::Out.Write($buffer, 0, $read)
             continue
@@ -86,7 +144,36 @@ try {
         [Console]::Out.Write($firstLine.ToString())
     }
     $process.WaitForExit()
-    exit $process.ExitCode
+    $errorText = $standardError.GetAwaiter().GetResult()
+    if ($errorText) {
+        [Console]::Error.Write($errorText)
+        $logWriter.Write($errorText)
+    }
+    $logWriter.WriteLine()
+    $logWriter.WriteLine('Finished: ' + [DateTimeOffset]::Now.ToString('O'))
+    $logWriter.WriteLine('Exit code: ' + $process.ExitCode)
+    $logWriter.Flush()
+    $processExitCode = $process.ExitCode
 } finally {
+    if ($processStarted -and -not $process.HasExited) {
+        if ([TrialFinderConsoleCancellation]::Requested) {
+            [void]$process.WaitForExit(15000)
+        }
+        if (-not $process.HasExited) {
+            $process.Kill()
+            $process.WaitForExit()
+        }
+    }
+    if ([TrialFinderConsoleCancellation]::Requested) {
+        $logWriter.WriteLine('Stopped by Ctrl+C; completed shards remain checkpointed.')
+        $logWriter.Flush()
+    }
+    [TrialFinderConsoleCancellation]::Uninstall()
+    $logWriter.Dispose()
     $process.Dispose()
 }
+
+if ([TrialFinderConsoleCancellation]::Requested) {
+    exit 130
+}
+exit $processExitCode

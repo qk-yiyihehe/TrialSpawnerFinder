@@ -1,1 +1,6 @@
 DEVELOPMENT_HANDOFF.md
+.runtime/
+logs/
+results-*.csv
+results-*.txt
+TrialSpawnerFinder-*.zip

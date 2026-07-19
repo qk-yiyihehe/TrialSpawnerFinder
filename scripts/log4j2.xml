@@ -2,24 +2,30 @@
 <Configuration status="WARN">
     <Appenders>
         <Console name="Console" target="SYSTEM_OUT">
-            <RegexFilter regex="^Cannot (push|pop).*profiler tick hasn't started.*$"
-                         onMatch="DENY" onMismatch="NEUTRAL"/>
+            <Filters>
+                <RegexFilter regex="^Cannot (push|pop).*profiler tick hasn't started.*$"
+                             onMatch="DENY" onMismatch="NEUTRAL"/>
+                <RegexFilter regex=".*\[STDOUT\]:.*"
+                             onMatch="ACCEPT" onMismatch="NEUTRAL"/>
+                <ThresholdFilter level="ERROR" onMatch="ACCEPT" onMismatch="DENY"/>
+            </Filters>
             <PatternLayout pattern="[%d{HH:mm:ss}] [%t/%level] (%logger{1}) %msg{nolookups}%n"/>
         </Console>
         <RollingRandomAccessFile name="LatestFile"
                                  fileName="logs/latest.log"
-                                 filePattern="logs/%d{yyyy-MM-dd}-%i.log.gz">
+                                 filePattern="logs/archive/latest-%d{yyyy-MM-dd-HH-mm-ss}-%i.log.gz">
             <PatternLayout pattern="[%d{HH:mm:ss}] [%t/%level] (%logger{1}) %msg{nolookups}%n"/>
+            <DefaultRolloverStrategy fileIndex="nomax"/>
             <Policies>
-                <TimeBasedTriggeringPolicy/>
                 <OnStartupTriggeringPolicy/>
+                <SizeBasedTriggeringPolicy size="200MB"/>
             </Policies>
         </RollingRandomAccessFile>
         <RollingRandomAccessFile name="DebugFile"
                                  fileName="logs/debug.log"
-                                 filePattern="logs/debug-%i.log.gz">
+                                 filePattern="logs/archive/debug-%d{yyyy-MM-dd-HH-mm-ss}-%i.log.gz">
             <PatternLayout pattern="[%d{HH:mm:ss}] [%t/%level] (%logger) %msg{nolookups}%n"/>
-            <DefaultRolloverStrategy max="5" fileIndex="min"/>
+            <DefaultRolloverStrategy fileIndex="nomax"/>
             <Policies>
                 <SizeBasedTriggeringPolicy size="200MB"/>
                 <OnStartupTriggeringPolicy/>
@@ -33,7 +39,7 @@
             <AppenderRef ref="DebugFile" level="debug"/>
         </Logger>
         <Root level="debug">
-            <AppenderRef ref="Console" level="error"/>
+            <AppenderRef ref="Console"/>
             <AppenderRef ref="LatestFile" level="info"/>
             <AppenderRef ref="DebugFile" level="debug"/>
         </Root>
