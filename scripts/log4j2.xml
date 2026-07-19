@@ -5,7 +5,7 @@
             <Filters>
                 <RegexFilter regex="^Cannot (push|pop).*profiler tick hasn't started.*$"
                              onMatch="DENY" onMismatch="NEUTRAL"/>
-                <RegexFilter regex=".*\[STDOUT\]:.*"
+                <RegexFilter regex=".*\[STDOUT\].*"
                              onMatch="ACCEPT" onMismatch="NEUTRAL"/>
                 <ThresholdFilter level="ERROR" onMatch="ACCEPT" onMismatch="DENY"/>
             </Filters>
