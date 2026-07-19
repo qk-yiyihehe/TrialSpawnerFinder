@@ -5,10 +5,13 @@ cd /d "%~dp0"
 
 set "RUNTIME=%~dp0.runtime"
 set "SELECTION=%RUNTIME%\selection.bat"
+set "CUSTOM_JAVA_FILE=%RUNTIME%\custom-java-home.txt"
 
 powershell.exe -NoProfile -ExecutionPolicy Bypass -File "%~dp0scripts\validate-config.ps1" -ConfigPath "%~dp0finder.properties" -SelectionPath "%SELECTION%"
 if errorlevel 1 goto failed
 call "%SELECTION%"
+set "CUSTOM_JAVA_HOME="
+if exist "%CUSTOM_JAVA_FILE%" set /p "CUSTOM_JAVA_HOME="<"%CUSTOM_JAVA_FILE%"
 
 set "SERVER=%RUNTIME%\minecraft-%ENGINE_VERSION%"
 set "JAVA_PATH_FILE=%SERVER%\java-path.txt"
@@ -17,9 +20,14 @@ set "JAVA_RUNNER=%~dp0scripts\run-java-clean.ps1"
 set "LOG_DIR=%~dp0logs"
 for /f %%I in ('powershell.exe -NoProfile -Command "Get-Date -Format yyyyMMdd-HHmmss-fff"') do set "LAUNCHER_LOG=!LOG_DIR!\launcher-%ENGINE_VERSION%-%%I.log"
 
-if not exist "%JAVA_PATH_FILE%" goto not_installed
-set /p "JAVA="<"%JAVA_PATH_FILE%"
-if not exist "%JAVA%" goto not_installed
+if defined CUSTOM_JAVA_HOME (
+    set "JAVA=!CUSTOM_JAVA_HOME!\bin\java.exe"
+    if not exist "!JAVA!" goto custom_java_missing
+) else (
+    if not exist "%JAVA_PATH_FILE%" goto not_installed
+    set /p "JAVA="<"%JAVA_PATH_FILE%"
+    if not exist "!JAVA!" goto not_installed
+)
 set "JAVA_QUIET_ARG="
 "%JAVA%" --sun-misc-unsafe-memory-access=allow -version >nul 2>&1
 if not errorlevel 1 set "JAVA_QUIET_ARG=--sun-misc-unsafe-memory-access=allow"
@@ -43,11 +51,20 @@ if not exist "%LOG_DIR%" mkdir "%LOG_DIR%"
 >>"%SERVER%\server.properties" echo spawn-protection=0
 >>"%SERVER%\server.properties" echo view-distance=2
 >>"%SERVER%\server.properties" echo simulation-distance=2
+>>"%SERVER%\server.properties" echo server-port=!SERVER_PORT!
 >>"%SERVER%\server.properties" echo max-tick-time=-1
 >>"%SERVER%\server.properties" echo sync-chunk-writes=false
 
 echo.
-echo 正在启动规则版本 %GENERATION_VERSION%，实际引擎 Minecraft %ENGINE_VERSION%...
+echo 正在启动规则版本 !GENERATION_VERSION!，实际引擎 Minecraft !ENGINE_VERSION!...
+echo 世界种子：!SEED!
+echo 运行 JDK：!JAVA!
+echo 服务端端口：!SERVER_PORT!
+if /i "!FULL_WORLD!"=="true" (
+    echo 搜索范围：完整世界
+) else (
+    echo 搜索范围：!SEARCH_AREA_SHAPE!；中心 !SEARCH_CENTER_X!,!SEARCH_CENTER_Z!；半径 !SEARCH_RADIUS! 方块
+)
 powershell.exe -NoProfile -ExecutionPolicy Bypass -File "%JAVA_RUNNER%" -JavaPath "%JAVA%" -WorkingDirectory "%SERVER%" -QuietArgument "!JAVA_QUIET_ARG!" -LogConfiguration "%~dp0scripts\log4j2.xml" -OutputDirectory "%~dp0." -LauncherLog "!LAUNCHER_LOG!"
 set "EXIT_CODE=!ERRORLEVEL!"
 
@@ -90,6 +107,12 @@ goto failed
 :missing_runner
 echo.
 echo ERROR: 缺少 Java 输出过滤脚本：%JAVA_RUNNER%
+goto failed
+
+:custom_java_missing
+echo.
+echo ERROR: java-home 中找不到 bin\java.exe：!CUSTOM_JAVA_HOME!
+goto failed
 
 :failed
 echo.

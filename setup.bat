@@ -5,11 +5,14 @@ cd /d "%~dp0"
 
 set "RUNTIME=%~dp0.runtime"
 set "SELECTION=%RUNTIME%\selection.bat"
+set "CUSTOM_JAVA_FILE=%RUNTIME%\custom-java-home.txt"
 if not exist "%RUNTIME%" mkdir "%RUNTIME%"
 
 powershell.exe -NoProfile -ExecutionPolicy Bypass -File "%~dp0scripts\validate-config.ps1" -ConfigPath "%~dp0finder.properties" -SelectionPath "%SELECTION%"
 if errorlevel 1 goto failed
 call "%SELECTION%"
+set "CUSTOM_JAVA_HOME="
+if exist "%CUSTOM_JAVA_FILE%" set /p "CUSTOM_JAVA_HOME="<"%CUSTOM_JAVA_FILE%"
 
 set "SERVER_DIR=%RUNTIME%\minecraft-%ENGINE_VERSION%"
 set "JAVA_DIR=%RUNTIME%\java-25"
@@ -61,6 +64,12 @@ if not exist "%SERVER_DIR%" mkdir "%SERVER_DIR%"
 
 set "JAVA_EXE="
 set "FALLBACK_JAVA_EXE="
+if defined CUSTOM_JAVA_HOME (
+    call :check_compatible "!CUSTOM_JAVA_HOME!\bin\java.exe"
+    if not defined FALLBACK_JAVA_EXE goto custom_java_incompatible
+    set "JAVA_EXE=!FALLBACK_JAVA_EXE!"
+    goto java_ready
+)
 for /f "delims=" %%J in ('dir /b /s /a-d "%~dp0java.exe" 2^>nul ^| findstr.exe /i /v /c:"\.runtime\"') do if not defined JAVA_EXE call :check_graal "%%J"
 if defined JAVA_HOME if exist "%JAVA_HOME%\bin\java.exe" if not defined JAVA_EXE call :check_graal "%JAVA_HOME%\bin\java.exe"
 for /f "delims=" %%J in ('where.exe java.exe 2^>nul') do if not defined JAVA_EXE call :check_graal "%%J"
@@ -248,6 +257,10 @@ goto failed
 
 :java_setup_failed
 echo ERROR: GraalVM 25 下载或解压失败，并且没有找到兼容的备用 Java。
+goto failed
+
+:custom_java_incompatible
+echo ERROR: java-home 指向的 JDK 与所选 Minecraft 引擎不兼容：!CUSTOM_JAVA_HOME!
 
 :failed
 echo.
