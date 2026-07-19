@@ -17,6 +17,7 @@ set "SERVER=%RUNTIME%\minecraft-%ENGINE_VERSION%"
 set "JAVA_PATH_FILE=%SERVER%\java-path.txt"
 set "ENGINE_JAR=%~dp0engines\trial-spawner-finder-%ENGINE_VERSION%.jar"
 set "JAVA_RUNNER=%~dp0scripts\run-java-clean.ps1"
+set "PROGRESS_RENDERER=%~dp0scripts\progress-renderer.ps1"
 set "LOG_DIR=%~dp0logs"
 for /f %%I in ('powershell.exe -NoProfile -Command "Get-Date -Format yyyyMMdd-HHmmss-fff"') do set "LAUNCHER_LOG=!LOG_DIR!\launcher-%ENGINE_VERSION%-%%I.log"
 
@@ -36,6 +37,7 @@ if not exist "%SERVER%\.fabric\server\%ENGINE_VERSION%-server.jar" goto not_inst
 if not exist "%SERVER%\.fabric\server\fabric-loader-server-0.19.3-minecraft-%ENGINE_VERSION%.jar" goto not_installed
 if not exist "%ENGINE_JAR%" goto missing_engine
 if not exist "%JAVA_RUNNER%" goto missing_runner
+if not exist "%PROGRESS_RENDERER%" goto missing_renderer
 
 if exist "%SERVER%\search.failed" del /q "%SERVER%\search.failed"
 copy /y "finder.properties" "%SERVER%\finder.properties" >nul
@@ -107,6 +109,11 @@ goto failed
 :missing_runner
 echo.
 echo ERROR: 缺少 Java 输出过滤脚本：%JAVA_RUNNER%
+goto failed
+
+:missing_renderer
+echo.
+echo ERROR: 缺少搜索进度渲染脚本：%PROGRESS_RENDERER%
 goto failed
 
 :custom_java_missing

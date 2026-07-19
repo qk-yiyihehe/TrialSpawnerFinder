@@ -19,6 +19,7 @@
 
 $ErrorActionPreference = 'Stop'
 [Console]::OutputEncoding = [Text.UTF8Encoding]::new($false)
+. (Join-Path $PSScriptRoot 'progress-renderer.ps1')
 
 function Quote-Argument([string]$Value) {
     return '"' + $Value.Replace('"', '\"') + '"'
@@ -91,9 +92,7 @@ $process = [Diagnostics.Process]::new()
 $process.StartInfo = $startInfo
 $processStarted = $false
 $processExitCode = 1
-$firstLine = [Text.StringBuilder]::new()
 $firstLineHandled = $false
-$buffer = [char[]]::new(4096)
 $logDirectory = Split-Path -Parent $LauncherLog
 if ($logDirectory -and -not (Test-Path -LiteralPath $logDirectory)) {
     New-Item -ItemType Directory -Force -Path $logDirectory | Out-Null
@@ -113,39 +112,30 @@ try {
     $processStarted = $true
     $standardError = $process.StandardError.ReadToEndAsync()
 
-    while (($read = $process.StandardOutput.Read($buffer, 0, $buffer.Length)) -gt 0) {
-        $logWriter.Write($buffer, 0, $read)
-        $logWriter.Flush()
-        if ($firstLineHandled) {
-            [Console]::Out.Write($buffer, 0, $read)
+    while (($line = $process.StandardOutput.ReadLine()) -ne $null) {
+        $event = ConvertFrom-FinderProgressLine $line
+        if ($null -ne $event) {
+            Write-FinderProgressEvent $event
+            if (Test-FinderProgressLogDue $event) {
+                $logWriter.WriteLine('[progress] ' + $event.Line)
+                $logWriter.Flush()
+            }
             continue
         }
-
-        for ($index = 0; $index -lt $read; $index++) {
-            $character = $buffer[$index]
-            [void]$firstLine.Append($character)
-            if ($character -ne "`n") {
-                continue
-            }
-
-            $line = $firstLine.ToString().TrimEnd("`r", "`n")
-            if ($line -ne 'Starting net.fabricmc.loader.impl.game.minecraft.BundlerClassPathCapture') {
-                [Console]::Out.Write($firstLine.ToString())
-            }
+        $logWriter.WriteLine($line)
+        $logWriter.Flush()
+        if (-not $firstLineHandled -and
+                $line -eq 'Starting net.fabricmc.loader.impl.game.minecraft.BundlerClassPathCapture') {
             $firstLineHandled = $true
-            if ($index + 1 -lt $read) {
-                [Console]::Out.Write($buffer, $index + 1, $read - $index - 1)
-            }
-            break
+            continue
         }
-    }
-
-    if (-not $firstLineHandled -and $firstLine.Length -gt 0) {
-        [Console]::Out.Write($firstLine.ToString())
+        $firstLineHandled = $true
+        Write-FinderConsoleLine $line
     }
     $process.WaitForExit()
     $errorText = $standardError.GetAwaiter().GetResult()
     if ($errorText) {
+        Close-FinderProgressDisplay
         [Console]::Error.Write($errorText)
         $logWriter.Write($errorText)
     }
@@ -155,6 +145,7 @@ try {
     $logWriter.Flush()
     $processExitCode = $process.ExitCode
 } finally {
+    Close-FinderProgressDisplay
     if ($processStarted -and -not $process.HasExited) {
         if ([TrialFinderConsoleCancellation]::Requested) {
             [void]$process.WaitForExit(15000)
